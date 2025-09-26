@@ -47,7 +47,7 @@ const StatCard = ({ title, value, icon, color = 'primary', subtitle }) => (
 );
 
 const Dashboard = () => {
-  const { user, isStudent, isTeacher, isCoordinator } = useAuth();
+  const { user, isStudent, isCoordinator } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -59,20 +59,59 @@ const Dashboard = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
+      setError('');
       
       // Cargar datos según el rol del usuario
       let response;
       if (isCoordinator) {
-        response = await axios.get('/api/coordinators/dashboard');
+        try {
+          response = await axios.get('/api/coordinators/dashboard');
+        } catch (coordinatorError) {
+          console.warn('Error cargando dashboard de coordinador:', coordinatorError);
+          // Fallback para coordinadores
+          setDashboardData({ 
+            metrics: { 
+              totalStudents: 0, 
+              totalTeachers: 0, 
+              totalCourses: 0, 
+              activeUsersLastWeek: 0 
+            },
+            recentActivity: []
+          });
+          return;
+        }
       } else {
-        // Para estudiantes y profesores, cargar cursos
-        response = await axios.get('/api/classroom/courses');
+        try {
+          // Para estudiantes y profesores, cargar cursos
+          response = await axios.get('/api/classroom/courses');
+        } catch (classroomError) {
+          console.warn('Error cargando cursos de Classroom:', classroomError);
+          
+          if (classroomError.response?.status === 401) {
+            setError('Tu sesión con Google ha expirado. Por favor, cierra sesión e inicia sesión nuevamente.');
+          } else {
+            setError('No se pudieron cargar los cursos de Google Classroom. Verifica tu conexión.');
+          }
+          
+          // Fallback: mostrar dashboard básico sin datos de Classroom
+          setDashboardData({ 
+            courses: [],
+            message: 'Conecta con Google Classroom para ver tus cursos'
+          });
+          return;
+        }
       }
       
       setDashboardData(response.data);
     } catch (err) {
       console.error('Error cargando dashboard:', err);
       setError('Error al cargar los datos del dashboard');
+      
+      // Fallback básico
+      setDashboardData({ 
+        courses: [],
+        message: 'Dashboard en modo básico'
+      });
     } finally {
       setLoading(false);
     }
@@ -90,51 +129,54 @@ const Dashboard = () => {
   };
 
   const getRoleSpecificStats = () => {
-    if (isCoordinator && dashboardData?.metrics) {
+    if (isCoordinator) {
+      const metrics = dashboardData?.metrics || {};
       return [
         {
           title: 'Total Estudiantes',
-          value: dashboardData.metrics.totalStudents,
+          value: metrics.totalStudents || 0,
           icon: <People />,
           color: 'primary',
         },
         {
           title: 'Total Profesores',
-          value: dashboardData.metrics.totalTeachers,
+          value: metrics.totalTeachers || 0,
           icon: <School />,
           color: 'secondary',
         },
         {
           title: 'Cursos Activos',
-          value: dashboardData.metrics.totalCourses,
+          value: metrics.totalCourses || 0,
           icon: <Assignment />,
           color: 'success',
         },
         {
           title: 'Actividad Semanal',
-          value: dashboardData.metrics.activeUsersLastWeek,
+          value: metrics.activeUsersLastWeek || 0,
           icon: <TrendingUp />,
           color: 'info',
           subtitle: 'usuarios activos',
         },
       ];
-    } else if (dashboardData?.courses) {
+    } else {
+      // Para estudiantes y profesores
+      const courses = dashboardData?.courses || [];
       return [
         {
           title: 'Mis Cursos',
-          value: dashboardData.courses.length,
+          value: courses.length,
           icon: <School />,
           color: 'primary',
         },
         {
           title: 'Tareas Pendientes',
-          value: 0, // Por implementar
+          value: '—', // Por implementar
           icon: <Assignment />,
           color: 'warning',
         },
         {
           title: 'Progreso General',
-          value: '85%', // Por implementar
+          value: courses.length > 0 ? '85%' : '—',
           icon: <TrendingUp />,
           color: 'success',
         },
@@ -146,7 +188,6 @@ const Dashboard = () => {
         },
       ];
     }
-    return [];
   };
 
   if (loading) {
@@ -193,11 +234,34 @@ const Dashboard = () => {
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert 
+          severity={error.includes('sesión con Google') ? 'warning' : 'error'} 
+          sx={{ mb: 3 }}
+          action={
+            <Box>
+              <Button onClick={loadDashboardData} sx={{ mr: 1 }}>
+                Reintentar
+              </Button>
+              {error.includes('sesión con Google') && (
+                <Button 
+                  onClick={() => window.location.href = '/login'} 
+                  variant="contained"
+                  size="small"
+                >
+                  Reautenticar
+                </Button>
+              )}
+            </Box>
+          }
+        >
           {error}
-          <Button onClick={loadDashboardData} sx={{ ml: 2 }}>
-            Reintentar
-          </Button>
+        </Alert>
+      )}
+
+      {/* Info sobre el estado de Google Classroom */}
+      {!error && dashboardData?.message && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          {dashboardData.message}
         </Alert>
       )}
 
@@ -220,7 +284,7 @@ const Dashboard = () => {
                 Actividad Reciente
               </Typography>
               
-              {isCoordinator && dashboardData?.recentActivity ? (
+              {isCoordinator && dashboardData?.recentActivity?.length > 0 ? (
                 <Box>
                   {dashboardData.recentActivity.slice(0, 5).map((activity, index) => (
                     <Box 
@@ -253,9 +317,19 @@ const Dashboard = () => {
                   ))}
                 </Box>
               ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No hay actividad reciente para mostrar
-                </Typography>
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    {isCoordinator 
+                      ? 'No hay actividad reciente para mostrar'
+                      : 'Bienvenido/a a Semillero Digital'
+                    }
+                  </Typography>
+                  {dashboardData?.message && (
+                    <Typography variant="caption" color="text.secondary">
+                      {dashboardData.message}
+                    </Typography>
+                  )}
+                </Box>
               )}
             </CardContent>
           </Card>
@@ -275,6 +349,7 @@ const Dashboard = () => {
                   startIcon={<School />}
                   fullWidth
                   sx={{ justifyContent: 'flex-start' }}
+                  onClick={() => window.location.href = '/courses'}
                 >
                   Ver Cursos
                 </Button>
@@ -285,6 +360,7 @@ const Dashboard = () => {
                     startIcon={<People />}
                     fullWidth
                     sx={{ justifyContent: 'flex-start' }}
+                    onClick={() => window.location.href = '/students'}
                   >
                     Gestionar Estudiantes
                   </Button>
@@ -296,6 +372,7 @@ const Dashboard = () => {
                     startIcon={<TrendingUp />}
                     fullWidth
                     sx={{ justifyContent: 'flex-start' }}
+                    onClick={() => alert('Reportes - Próximamente disponible')}
                   >
                     Ver Reportes
                   </Button>
@@ -306,6 +383,7 @@ const Dashboard = () => {
                   startIcon={<Notifications />}
                   fullWidth
                   sx={{ justifyContent: 'flex-start' }}
+                  onClick={() => window.location.href = '/notifications'}
                 >
                   Notificaciones
                 </Button>

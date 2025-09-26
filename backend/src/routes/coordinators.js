@@ -149,4 +149,79 @@ router.get('/reports/progress', auth, authorize('coordinator', 'admin'), async (
   }
 });
 
+// @route   PUT /api/coordinators/users/:userId/role
+// @desc    Cambiar rol de un usuario
+// @access  Private
+router.put('/users/:userId/role', auth, authorize('coordinator', 'admin'), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    if (!['student', 'teacher', 'coordinator'].includes(role)) {
+      return res.status(400).json({
+        error: 'Rol inválido',
+        message: 'El rol debe ser: student, teacher o coordinator'
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        error: 'Usuario no encontrado'
+      });
+    }
+
+    user.role = role;
+    await user.save();
+
+    res.json({
+      message: 'Rol actualizado correctamente',
+      user: user.getPublicProfile()
+    });
+
+  } catch (error) {
+    console.error('Error actualizando rol:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
+// @route   GET /api/coordinators/users
+// @desc    Obtener lista de usuarios para gestión
+// @access  Private
+router.get('/users', auth, authorize('coordinator', 'admin'), async (req, res) => {
+  try {
+    const { role, cohort, page = 1, limit = 20 } = req.query;
+    
+    const filter = { isActive: true };
+    if (role) filter.role = role;
+    if (cohort) filter['metadata.cohort'] = cohort;
+
+    const users = await User.find(filter)
+      .select('-googleTokens')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await User.countDocuments(filter);
+
+    res.json({
+      users: users.map(user => user.getPublicProfile()),
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo usuarios:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
 module.exports = router;

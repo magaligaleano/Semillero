@@ -13,6 +13,8 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import Courses from './pages/Courses/Courses';
 import Students from './pages/Students/Students';
 import Teachers from './pages/Teachers/Teachers';
+import Tasks from './pages/Tasks/Tasks';
+import Notifications from './pages/Notifications/Notifications';
 import Profile from './pages/Profile/Profile';
 import NotFound from './pages/NotFound/NotFound';
 
@@ -72,6 +74,8 @@ function App() {
           <Route path="courses" element={<Courses />} />
           <Route path="students" element={<Students />} />
           <Route path="teachers" element={<Teachers />} />
+          <Route path="tasks" element={<Tasks />} />
+          <Route path="notifications" element={<Notifications />} />
           <Route path="profile" element={<Profile />} />
         </Route>
 

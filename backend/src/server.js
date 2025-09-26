@@ -29,6 +29,11 @@ const limiter = rateLimit({
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // límite de requests por ventana de tiempo
   message: {
     error: 'Demasiadas solicitudes desde esta IP, intenta de nuevo más tarde.'
+  },
+  trustProxy: false, // Deshabilitar trust proxy para evitar el error
+  skip: (req) => {
+    // Saltar rate limiting para rutas de callback de OAuth
+    return req.path.includes('/auth/google/callback');
   }
 });
 app.use('/api/', limiter);
@@ -57,6 +62,9 @@ app.get('/health', (req, res) => {
     environment: process.env.NODE_ENV
   });
 });
+
+// Ruta especial para callback de Google (sin /api)
+app.use('/auth', authRoutes);
 
 // Rutas de la API
 app.use('/api/auth', authRoutes);

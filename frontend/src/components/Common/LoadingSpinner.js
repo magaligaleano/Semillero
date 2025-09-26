@@ -10,7 +10,13 @@ const LoadingSpinner = ({ message = 'Cargando...', size = 40 }) => {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
+        width: '100vw',
+        position: 'fixed',
+        top: 0,
+        left: 0,
         gap: 2,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        zIndex: 9999,
       }}
     >
       <CircularProgress size={size} />

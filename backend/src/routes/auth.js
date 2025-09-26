@@ -7,7 +7,7 @@ const {
   refreshAccessToken 
 } = require('../config/googleAuth');
 const User = require('../models/User');
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -24,6 +24,29 @@ router.get('/google', (req, res) => {
       error: 'Error interno del servidor',
       message: 'No se pudo generar la URL de autorización'
     });
+  }
+});
+
+// @route   GET /auth/google/callback (sin /api para coincidir con Google OAuth)
+// @desc    Manejar callback de Google OAuth y redirigir al frontend
+// @access  Public
+router.get('/google/callback', (req, res) => {
+  try {
+    const { code, error } = req.query;
+    
+    if (error) {
+      return res.redirect(`${process.env.FRONTEND_URL}/login?error=${encodeURIComponent(error)}`);
+    }
+    
+    if (!code) {
+      return res.redirect(`${process.env.FRONTEND_URL}/login?error=no_code`);
+    }
+    
+    // Redirigir al frontend con el código para que maneje la autenticación
+    res.redirect(`${process.env.FRONTEND_URL}/login?code=${code}`);
+  } catch (error) {
+    console.error('Error en callback de Google:', error);
+    res.redirect(`${process.env.FRONTEND_URL}/login?error=callback_error`);
   }
 });
 
@@ -66,11 +89,24 @@ router.post('/google/callback', async (req, res) => {
       user.lastLogin = new Date();
     } else {
       // Crear nuevo usuario
+      // Determinar rol basado en el dominio del email o configuración
+      let role = 'student'; // Por defecto
+      
+      // Lógica para asignar roles automáticamente
+      if (userInfo.email.includes('@semillerodigital.org') || 
+          userInfo.email.includes('@coordinador.')) {
+        role = 'coordinator';
+      } else if (userInfo.email.includes('@profesor.') || 
+                 userInfo.email.includes('@teacher.')) {
+        role = 'teacher';
+      }
+      
       user = new User({
         email: userInfo.email,
         googleId: userInfo.id,
         name: userInfo.name,
         picture: userInfo.picture,
+        role: role,
         googleTokens: {
           accessToken: tokens.access_token,
           refreshToken: tokens.refresh_token,

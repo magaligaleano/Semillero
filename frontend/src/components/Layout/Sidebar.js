@@ -64,7 +64,7 @@ const Sidebar = ({ open, onClose, isMobile }) => {
     {
       text: 'Tareas',
       icon: <Assignment />,
-      path: '/assignments',
+      path: '/tasks',
       roles: ['student', 'teacher', 'coordinator', 'admin'],
     },
     {
