@@ -28,22 +28,99 @@ router.get('/google', (req, res) => {
 });
 
 // @route   GET /auth/google/callback (sin /api para coincidir con Google OAuth)
-// @desc    Manejar callback de Google OAuth y redirigir al frontend
+// @desc    Manejar callback de Google OAuth y procesar directamente
 // @access  Public
-router.get('/google/callback', (req, res) => {
+router.get('/google/callback', async (req, res) => {
   try {
     const { code, error } = req.query;
     
     if (error) {
+      console.error('Error en OAuth:', error);
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=${encodeURIComponent(error)}`);
     }
     
     if (!code) {
       return res.redirect(`${process.env.FRONTEND_URL}/login?error=no_code`);
     }
+
+    // Procesar el código directamente aquí
+    try {
+      // Obtener tokens de Google
+      const tokens = await getTokens(code);
+      
+      // Obtener información del usuario
+      const userInfo = await getUserInfo(tokens.access_token);
+
+      // Verificar si MongoDB está conectado
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState !== 1) {
+        console.log('⚠️  MongoDB no conectado, creando usuario temporal');
+        
+        // Generar JWT token sin base de datos
+        const jwtToken = jwt.sign(
+          { 
+            userId: userInfo.id,
+            email: userInfo.email,
+            name: userInfo.name,
+            role: 'student' // Rol por defecto
+          },
+          process.env.JWT_SECRET,
+          { expiresIn: process.env.JWT_EXPIRE || '7d' }
+        );
+
+        return res.redirect(`${process.env.FRONTEND_URL}/login/success?token=${jwtToken}`);
+      }
+
+      // Buscar o crear usuario en la base de datos
+      let user = await User.findOne({ 
+        $or: [
+          { googleId: userInfo.id },
+          { email: userInfo.email }
+        ]
+      });
+
+      if (user) {
+        // Usuario existente - actualizar información
+        user.name = userInfo.name;
+        user.picture = userInfo.picture;
+        user.accessToken = tokens.access_token;
+        user.refreshToken = tokens.refresh_token || user.refreshToken;
+        user.lastLogin = new Date();
+        await user.save();
+      } else {
+        // Nuevo usuario - crear registro
+        user = new User({
+          googleId: userInfo.id,
+          email: userInfo.email,
+          name: userInfo.name,
+          picture: userInfo.picture,
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          role: 'student', // Rol por defecto
+          lastLogin: new Date()
+        });
+        await user.save();
+      }
+
+      // Generar JWT token
+      const jwtToken = jwt.sign(
+        { 
+          userId: user._id,
+          email: user.email,
+          role: user.role 
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRE || '7d' }
+      );
+
+      // Redirigir al frontend con el token
+      res.redirect(`${process.env.FRONTEND_URL}/login/success?token=${jwtToken}`);
+      
+    } catch (authError) {
+      console.error('Error procesando autenticación:', authError);
+      return res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
+    }
     
-    // Redirigir al frontend con el código para que maneje la autenticación
-    res.redirect(`${process.env.FRONTEND_URL}/login?code=${code}`);
   } catch (error) {
     console.error('Error en callback de Google:', error);
     res.redirect(`${process.env.FRONTEND_URL}/login?error=callback_error`);

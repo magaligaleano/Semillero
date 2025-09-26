@@ -19,21 +19,48 @@ const Login = () => {
   const [searchParams] = useSearchParams();
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [processedCode, setProcessedCode] = useState(null);
 
   // Manejar callback de Google OAuth
   useEffect(() => {
-    const code = searchParams.get('code');
+    const token = searchParams.get('token');
     const error = searchParams.get('error');
 
     if (error) {
-      setError('Error en la autorización con Google. Por favor, intenta de nuevo.');
+      let errorMessage = 'Error en la autorización con Google. Por favor, intenta de nuevo.';
+      
+      switch (error) {
+        case 'auth_failed':
+          errorMessage = 'Error al procesar la autenticación. Por favor, intenta de nuevo.';
+          break;
+        case 'no_code':
+          errorMessage = 'No se recibió código de autorización. Por favor, intenta de nuevo.';
+          break;
+        case 'callback_error':
+          errorMessage = 'Error en el callback de Google. Por favor, intenta de nuevo.';
+          break;
+      }
+      
+      setError(errorMessage);
+      // Limpiar URL
+      window.history.replaceState({}, document.title, window.location.pathname);
       return;
     }
 
-    if (code) {
-      handleGoogleCallback(code);
+    // Si recibimos un token directamente del backend
+    if (token) {
+      handleTokenSuccess(token);
     }
   }, [searchParams]);
+
+  const handleTokenSuccess = (token) => {
+    // Guardar token y redirigir
+    localStorage.setItem('token', token);
+    // Limpiar URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+    // Recargar para que AuthContext detecte el token
+    window.location.reload();
+  };
 
   const handleGoogleCallback = async (code) => {
     setIsLoading(true);
@@ -44,9 +71,13 @@ const Login = () => {
       
       if (!result.success) {
         setError(result.error || 'Error al iniciar sesión');
+        // Limpiar URL después de error
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
     } catch (err) {
       setError('Error inesperado. Por favor, intenta de nuevo.');
+      // Limpiar URL después de error
+      window.history.replaceState({}, document.title, window.location.pathname);
     } finally {
       setIsLoading(false);
     }

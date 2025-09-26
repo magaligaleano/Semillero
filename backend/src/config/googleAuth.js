@@ -33,6 +33,10 @@ const getTokens = async (code) => {
     const { tokens } = await oauth2Client.getToken(code);
     return tokens;
   } catch (error) {
+    // Manejar errores específicos de OAuth
+    if (error.message.includes('invalid_grant')) {
+      throw new Error('Código de autorización expirado o inválido. Por favor, intenta iniciar sesión nuevamente.');
+    }
     throw new Error(`Error obteniendo tokens: ${error.message}`);
   }
 };

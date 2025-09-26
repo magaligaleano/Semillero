@@ -7,12 +7,17 @@
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm start",
+    "dev:docker": "npm run docker:up && sleep 5 && npm run dev",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
     "build": "cd frontend && npm run build",
     "start": "cd backend && npm start",
     "test": "concurrently \"cd backend && npm test\" \"cd frontend && npm test\"",
     "lint": "concurrently \"cd backend && npm run lint\" \"cd frontend && npm run lint\"",
-    "lint:fix": "concurrently \"cd backend && npm run lint:fix\" \"cd frontend && npm run lint:fix\""
+    "lint:fix": "concurrently \"cd backend && npm run lint:fix\" \"cd frontend && npm run lint:fix\"",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:reset": "docker compose down -v && docker compose up -d"
   },
   "keywords": [
     "semillero",
