@@ -5,20 +5,30 @@ import {
   Card,
   CardContent,
   Typography,
-  Avatar,
-  Chip,
-  Button,
   Alert,
+  Chip,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Divider,
+  Button,
+  Avatar,
 } from '@mui/material';
 import {
   School,
   Assignment,
-  TrendingUp,
   People,
   Notifications,
+  TrendingUp,
+  CheckCircle,
+  Schedule,
+  Warning,
   CalendarToday,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
+import LoadingSpinner from '../../components/Common/LoadingSpinner';
+import GoogleConnectButton from '../../components/Common/GoogleConnectButton';
 import axios from 'axios';
 
 const StatCard = ({ title, value, icon, color = 'primary', subtitle }) => (
@@ -87,8 +97,10 @@ const Dashboard = () => {
         } catch (classroomError) {
           console.warn('Error cargando cursos de Classroom:', classroomError);
           
-          if (classroomError.response?.status === 401) {
-            setError('Tu sesión con Google ha expirado. Por favor, cierra sesión e inicia sesión nuevamente.');
+          if (classroomError.response?.status === 400 && classroomError.response?.data?.requiresGoogleAuth) {
+            setError('Para acceder a Google Classroom, necesitas autenticarte con Google OAuth. Puedes usar las funciones básicas de la plataforma.');
+          } else if (classroomError.response?.status === 401) {
+            setError('Tu sesión con Google ha expirado. Por favor, cierra sesión e inicia sesión nuevamente con Google.');
           } else {
             setError('No se pudieron cargar los cursos de Google Classroom. Verifica tu conexión.');
           }
@@ -96,7 +108,9 @@ const Dashboard = () => {
           // Fallback: mostrar dashboard básico sin datos de Classroom
           setDashboardData({ 
             courses: [],
-            message: 'Conecta con Google Classroom para ver tus cursos'
+            message: user?.authMethod === 'local' 
+              ? 'Conecta con Google OAuth para acceder a Google Classroom' 
+              : 'Conecta con Google Classroom para ver tus cursos'
           });
           return;
         }
@@ -263,6 +277,14 @@ const Dashboard = () => {
         <Alert severity="info" sx={{ mb: 3 }}>
           {dashboardData.message}
         </Alert>
+      )}
+
+      {/* Google Connect Button para usuarios locales */}
+      {user?.authMethod === 'local' && !error && (
+        <GoogleConnectButton 
+          title="Conectar con Google Classroom"
+          description="Para acceder a todas las funcionalidades de Google Classroom, conecta tu cuenta de Google. Esto te permitirá ver tus cursos, tareas y estudiantes."
+        />
       )}
 
       {/* Statistics Cards */}

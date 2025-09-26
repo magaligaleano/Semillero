@@ -10,9 +10,27 @@ const router = express.Router();
 // @route   GET /api/classroom/courses
 // @desc    Obtener cursos de Google Classroom del usuario
 // @access  Private
-router.get('/courses', auth, checkGoogleToken, async (req, res) => {
+router.get('/courses', auth, async (req, res) => {
   try {
     const user = req.userDoc;
+    
+    // Verificar si el usuario tiene tokens de Google
+    if (!user.googleTokens || !user.googleTokens.accessToken) {
+      return res.status(400).json({
+        error: 'Google OAuth requerido',
+        message: 'Para acceder a Google Classroom, debes autenticarte con Google OAuth',
+        requiresGoogleAuth: true
+      });
+    }
+
+    // Verificar si el token ha expirado
+    if (user.isTokenExpired()) {
+      return res.status(401).json({
+        error: 'Token de Google expirado',
+        message: 'Tu sesión con Google ha expirado, por favor reautentícate',
+        requiresReauth: true
+      });
+    }
     
     // Configurar cliente de Google Classroom
     const authClient = setCredentials(user.googleTokens);

@@ -23,6 +23,9 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem('token');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+          console.log('🎫 Token agregado a request:', config.url);
+        } else {
+          console.log('⚠️ No hay token para request:', config.url);
         }
         return config;
       },
@@ -122,16 +125,23 @@ export const AuthProvider = ({ children }) => {
   const loginWithCredentials = async (email, password) => {
     try {
       setLoading(true);
+      console.log('🔐 Intentando login con:', email);
+      
       const response = await axios.post('/api/auth/login', { email, password });
+      console.log('✅ Login response:', response.data);
       
       const { token, user: userData } = response.data;
       
       localStorage.setItem('token', token);
       setUser(userData);
       
+      console.log('👤 Usuario establecido:', userData);
+      console.log('🎫 Token guardado:', token ? 'Sí' : 'No');
+      
       return { success: true };
     } catch (error) {
-      console.error('Error en login:', error);
+      console.error('❌ Error en login:', error);
+      console.error('Response data:', error.response?.data);
       return { 
         success: false, 
         error: error.response?.data?.message || 'Error al iniciar sesión' 
