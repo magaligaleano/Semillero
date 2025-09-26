@@ -119,6 +119,55 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginWithCredentials = async (email, password) => {
+    try {
+      setLoading(true);
+      const response = await axios.post('/api/auth/login', { email, password });
+      
+      const { token, user: userData } = response.data;
+      
+      localStorage.setItem('token', token);
+      setUser(userData);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error en login:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.message || 'Error al iniciar sesión' 
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const register = async (email, password, name, role = 'student') => {
+    try {
+      setLoading(true);
+      const response = await axios.post('/api/auth/register', { 
+        email, 
+        password, 
+        name, 
+        role 
+      });
+      
+      const { token, user: userData } = response.data;
+      
+      localStorage.setItem('token', token);
+      setUser(userData);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error en registro:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.message || 'Error al registrar usuario' 
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const refreshToken = async () => {
     try {
       await axios.post('/api/auth/refresh');
@@ -133,6 +182,8 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     login,
+    loginWithCredentials,
+    register,
     logout,
     getAuthUrl,
     refreshToken,

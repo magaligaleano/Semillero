@@ -17,7 +17,7 @@ const auth = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Verificar que el usuario existe y está activo
-    const user = await User.findById(decoded.user.id);
+    const user = await User.findById(decoded.userId);
     
     if (!user) {
       return res.status(401).json({ 
@@ -34,7 +34,11 @@ const auth = async (req, res, next) => {
     }
 
     // Agregar usuario a la request
-    req.user = decoded.user;
+    req.user = { 
+      id: user._id,
+      email: user.email,
+      role: user.role 
+    };
     req.userDoc = user;
     
     next();

@@ -8,7 +8,9 @@
     "dev": "nodemon src/server.js",
     "test": "jest",
     "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix"
+    "lint:fix": "eslint src/ --fix",
+    "seed": "node src/migrations/seedUsers.js",
+    "seed:users": "node src/migrations/seedUsers.js"
   },
   "keywords": ["semillero", "education", "google-classroom", "api"],
   "author": "Semillero Digital",

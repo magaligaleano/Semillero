@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const { body, validationResult } = require('express-validator');
 const { 
   getAuthUrl, 
   getTokens, 
@@ -298,6 +299,173 @@ router.post('/logout', auth, async (req, res) => {
     console.error('Error cerrando sesión:', error);
     res.status(500).json({ 
       error: 'Error interno del servidor' 
+    });
+  }
+});
+
+// @route   POST /api/auth/register
+// @desc    Registrar nuevo usuario con email y password
+// @access  Public
+router.post('/register', [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Email válido es requerido'),
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password debe tener al menos 6 caracteres'),
+  body('name')
+    .trim()
+    .isLength({ min: 2 })
+    .withMessage('Nombre debe tener al menos 2 caracteres'),
+  body('role')
+    .optional()
+    .isIn(['student', 'teacher', 'coordinator', 'admin'])
+    .withMessage('Rol inválido')
+], async (req, res) => {
+  try {
+    // Validar entrada
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Datos inválidos',
+        details: errors.array()
+      });
+    }
+
+    const { email, password, name, role = 'student' } = req.body;
+
+    // Verificar si el usuario ya existe
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        error: 'El usuario ya existe',
+        message: 'Ya existe una cuenta con este email'
+      });
+    }
+
+    // Crear nuevo usuario
+    const user = new User({
+      email,
+      password,
+      name,
+      role,
+      authMethod: 'local',
+      lastLogin: new Date()
+    });
+
+    await user.save();
+
+    // Generar JWT token
+    const token = jwt.sign(
+      { 
+        userId: user._id,
+        email: user.email,
+        role: user.role 
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+    );
+
+    res.status(201).json({
+      message: 'Usuario registrado exitosamente',
+      token,
+      user: user.getPublicProfile()
+    });
+
+  } catch (error) {
+    console.error('Error en registro:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudo registrar el usuario'
+    });
+  }
+});
+
+// @route   POST /api/auth/login
+// @desc    Login con email y password
+// @access  Public
+router.post('/login', [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Email válido es requerido'),
+  body('password')
+    .notEmpty()
+    .withMessage('Password es requerido')
+], async (req, res) => {
+  try {
+    // Validar entrada
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Datos inválidos',
+        details: errors.array()
+      });
+    }
+
+    const { email, password } = req.body;
+
+    // Buscar usuario por email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({
+        error: 'Credenciales inválidas',
+        message: 'Email o password incorrectos'
+      });
+    }
+
+    // Verificar si el usuario tiene password (no solo Google OAuth)
+    if (!user.password) {
+      return res.status(401).json({
+        error: 'Método de autenticación inválido',
+        message: 'Esta cuenta solo puede acceder con Google OAuth'
+      });
+    }
+
+    // Verificar password
+    const isValidPassword = await user.comparePassword(password);
+    if (!isValidPassword) {
+      return res.status(401).json({
+        error: 'Credenciales inválidas',
+        message: 'Email o password incorrectos'
+      });
+    }
+
+    // Verificar si la cuenta está activa
+    if (!user.isActive) {
+      return res.status(401).json({
+        error: 'Cuenta desactivada',
+        message: 'Tu cuenta ha sido desactivada. Contacta al administrador.'
+      });
+    }
+
+    // Actualizar último login
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Generar JWT token
+    const token = jwt.sign(
+      { 
+        userId: user._id,
+        email: user.email,
+        role: user.role 
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+    );
+
+    res.json({
+      message: 'Login exitoso',
+      token,
+      user: user.getPublicProfile()
+    });
+
+  } catch (error) {
+    console.error('Error en login:', error);
+    res.status(500).json({
+      error: 'Error interno del servidor',
+      message: 'No se pudo completar el login'
     });
   }
 });
